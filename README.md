@@ -144,55 +144,36 @@ Tại mỗi thời điểm snapshot, tập dữ liệu modeling bao gồm toàn 
 # 3.5. Feature Engineering
 Từ các feature ban đầu, thực hiện phái sinh ra nhiều feature theo cấu trúc: `{Metric}_{Feature}_{TimeFrame}`
 
-| Nhóm (Group)     | Cột gốc                       | Metric (Hàm)                  | TimeFrame     | Tên feature                       | Giải thích ý nghĩa                                                          |
-| ---------------- | ----------------------------- | ----------------------------- | ------------- | --------------------------------- | --------------------------------------------------------------------------- |
-| Monetary         | Order_value                   | sum                           | L1M, L3M, L5M | sum_LxM_value                     | Tổng chi tiêu thực tế qua các mốc 1, 3, 5 tháng                             |
-|                  | Order_value                   | mean                          | L1M, L3M, L5M | avg_LxM_value                     | Giá trị đơn hàng trung bình (AOV) từng thời kỳ                              |
-|                  | Order_value                   | std                           | L1M, L3M, L5M | std_LxM_value                     | Chi tiêu đều đặn (std thấp) hay đột biến (std cao)                          |
-|                  | Order_value                   | max                           | L1M, L3M, L5M | max_LxM_value                     | Giá trị đơn hàng lớn nhất - Phát hiện khách VIP tiềm năng                   |
-|                  | Order_value                   | min                           | L1M, L3M, L5M | min_LxM_value                     | Giá trị đơn hàng nhỏ nhất - Phân biệt khách "test buy"                      |
-|                  | Order_value                   | percentile(75)                | L1M, L3M, L5M | p75_LxM_value                     | Phân vị 75 - 75% đơn dưới ngưỡng nào                                        |
-|                  | Order_value                   | percentile(95)                | L1M, L3M, L5M | p95_LxM_value                     | Phân vị 95 - Giá trị đơn cao cấp                                            |
-|                  | Order_value                   | iqr (P75-P25)                 | L1M, L3M, L5M | iqr_LxM_value                     | Khoảng cách phân vị - Độ rộng phân bố                                       |
-| Frequency        | Order_id                      | count                         | L1M, L3M, L5M | cnt_LxM_orders                    | Tần suất đặt đơn (Đo độ "nghiện" mua sắm)                                   |
-| Recency          | Order_date                    | Snap − Max                    | History       | recency_days                      | Số ngày kể từ lần mua hàng cuối cùng                                        |
-| Tenure           | Order_date                    | Snap − Min                    | History       | tenure_days                       | Thâm niên/Độ gắn bó của khách với sàn                                       |
-| Basket Size      | Order_n_lines                 | mean                          | L1M, L3M, L5M | avg_LxM_skus                      | Độ rộng giỏ hàng (Số lượng trung bình sản phẩm unique)                      |
-|                  | Order_n_lines                 | max                           | L1M, L3M, L5M | max_LxM_skus                      | Số SKU max trong 1 đơn - Đặc trưng khách sỉ vs lẻ                           |
-|                  | Log_items                     | sum                           | L1M, L3M, L5M | sum_LxM_items_log                 | Tổng số lượng sản phẩm (dạng Log để khử nhiễu)                              |
-|                  | Log_items                     | mean                          | L1M, L3M, L5M | avg_LxM_items_log                 | Quy mô sản phẩm trung bình mỗi đơn (dạng Log)                               |
-| Category Stats   | Order_n_categories            | mean                          | L1M, L3M, L5M | avg_n_categories_LxM              | Số danh mục trung bình mỗi đơn                                              |
-|                  | Order_n_categories            | sum                           | L1M, L3M, L5M | sum_n_categories_LxM              | Tổng số danh mục qua các đơn                                                |
-| Diversity        | items_per_cat                 | mean                          | L1M, L3M, L5M | avg_items_per_cat_LxM             | Số sản phẩm trung bình trên mỗi danh mục (Order_n_lines/Order_n_categories) |
-|                  | sum_n_categories / cnt_orders | formula                       | L1M, L3M, L5M | category_diversity_LxM            | Tỷ lệ đa dạng danh mục trên mỗi đơn                                         |
-| Risk & Quality   | Is_canceled                   | sum                           | L1M, L3M, L5M | sum_LxM_canceled                  | Số lượng đơn hàng bị khách chủ động hủy                                     |
-|                  | Is_canceled, Order_id         | sum / count                   | L1M, L3M, L5M | cancel_rate_LxM                   | Tỷ lệ đơn bị lỗi/hủy theo từng kỳ L1M/L3M/L5M                               |
-|                  | Canceled_value, Order_value   | sum / sum                     | History       | global_cancel_val_ratio           | Tỉ lệ tiền hủy/tiền đặt lịch sử (Phát hiện VIP ảo)                          |
-|                  | Is_canceled                   | last                          | History       | last_order_canceled               | Đơn gần nhất có bị hủy không?                                               |
-| Intensity        | Order_value                   | last / global_aov             | Last Order    | last_order_intensity              | Cường độ đơn hàng gần nhất                                                  |
-|                  | Order_value                   | last / avg_L3M                | Last Order    | relative_last_order               | Giá trị đơn cuối so với trung bình L3M                                      |
-| Velocity         | Order_value                   | sum_L1M / (sum_L3M/3)         | Trend         | spend_velocity                    | Tốc độ chi tiêu đang nóng lên hay nguội đi                                  |
-|                  | Order_value                   | (sum_L1M - sum_L3M/3) / (sum_L3M/3 + 1)   | Trend         | value_growth_L1M_vs_L3M           | Tốc độ tăng trưởng chi tiêu tháng gần nhất                                  |
-|                  | Order_value                   | (sum_L3M - sum_L5M/5) / (sum_L5M/5 + 1) | Trend         | value_growth_L3M_vs_L5M           | Tốc độ tăng trưởng xu hướng dài hạn                                         |
-|                  | Order_id                      | cnt_L1M / (cnt_L3M/3)         | Trend         | order_acceleration                | Gia tốc đặt đơn đang tăng hay giảm                                          |
-|                  | Order_id                      | (cnt_L1M - cnt_L3M/3) / (cnt_L3M/3 + 1)   | Trend         | count_growth_L1M_vs_L3M           | Tốc độ tăng trưởng tần suất đặt đơn                                         |
-|                  | Order_id                      | cnt_L5M / 5                   | L5M           | order_velocity                    | Tần suất mua hàng trung bình mỗi tháng                                      |
-| Activity Density | Order_date                    | count(distinct day)           | L5M           | active_days_L5M                   | Số ngày duy nhất có giao dịch - Đo mức độ "chăm chỉ"                        |
-|                  | Order_id, active_days         | cnt_L5M / active_days         | L5M           | orders_per_active_day             | Cường độ mua khi đã vào sàn                                                 |
-|                  | Order_value, active_days      | sum_L5M / active_days         | L5M           | revenue_per_active_day            | Doanh thu/ngày hoạt động thực tế                                            |
-|                  | Order_id                      | max_daily / avg_daily         | L5M           | burst_ratio_orders                | Tỷ lệ bùng nổ - Ngày mua nhiều bất thường                                   |
-| Rhythm           | Order_date                    | mean(gap)                     | L5M           | avg_gap_L5M                       | Chu kỳ mua hàng trung bình                                                  |
-|                  | Order_date                    | mode(dayofweek)               | L5M           | preferred_order_day               | Ngày trong tuần hay đặt hàng nhất                                           |
-|                  | Order_date                    | count(weekend) / count(total) | L5M           | weekend_order_ratio               | Tỷ lệ đơn cuối tuần                                                         |
-| Activity Pattern | Order_date                    | count(distinct month)         | L5M           | active_months_L5M                 | Số tháng mua thực tế trong 5 tháng                                          |
-|                  | Order_date                    | max(date) - min(date)         | L5M           | days_between_first_last           | Khoảng thời gian giãn cách đơn đầu-cuối                                     |
-|                  | Order_date                    | max consecutive months        | L5M           | consecutive_active_months         | Số tháng liên tiếp có mua                                                   |
-|                  | Order_date                    | active_days / days_range      | L5M           | activity_density                  | Mật độ hoạt động                                                            |
-| RFM              | recency, frequency, monetary  | RobustScaler transform        | L5M           | rf_value, fm_value, rfm_clv_proxy | R×F, F×M, R×F×M - Proxy cho CLV (dùng RobustScaler)                         |
-| Geography        | Country                       | Binary (UK=1, Other=0)        | History       | is_UK                             | Phân loại hành vi khách nội địa vs. quốc tế                                 |
+| Nhóm (Group)         | Cột gốc                           | Metric (Hàm)             | TimeFrame     | Tên feature             | Giải thích ý nghĩa                                  |
+| -------------------- | --------------------------------- | ------------------------ | ------------- | ----------------------- | --------------------------------------------------- |
+| **Monetary**         | Order_value                       | sum                      | L1M, L3M, L5M | sum_LxM_value           | Tổng chi tiêu thực tế qua các mốc 1, 3, 5 tháng     |
+|                      | Order_value                       | mean                     | L1M, L3M, L5M | avg_LxM_value           | Giá trị đơn hàng trung bình (AOV) từng thời kỳ      |
+|                      | Order_value                       | std                      | L1M, L3M, L5M | std_LxM_value           | Chi tiêu đều đặn (std thấp) hay đột biến (std cao)  |
+| **Frequency**        | Order_id                          | count                    | L1M, L3M, L5M | cnt_LxM_orders          | Tần suất đặt đơn (Đo độ “nghiện” mua sắm)           |
+| **Recency ⭐**        | Order_date                        | Snap − Max               | History       | recency_days            | Số ngày kể từ lần mua hàng cuối cùng                |
+| **Tenure**           | Order_date                        | Snap − Min               | History       | tenure_days             | Thâm niên/Độ gắn bó của khách với sàn               |
+| **Basket Size**      | Order_n_lines                     | mean                     | L1M, L3M, L5M | avg_LxM_skus            | Độ rộng giỏ hàng (Số lượng sản phẩm unique mỗi đơn) |
+|                      | Log_items                         | sum                      | L1M, L3M, L5M | sum_LxM_items_log       | Tổng số lượng sản phẩm (dạng log để khử nhiễu)      |
+|                      | Log_items                         | mean                     | L1M, L3M, L5M | avg_LxM_items_log       | Quy mô sản phẩm trung bình mỗi đơn                  |
+|                      | Order_n_categories                         | sum                     | L1M, L3M, L5M | sum_n_categories_LxM       | Tổng số danh mục đã mua                  |
+|                      | Order_n_categories                         | mean                     | L1M, L3M, L5M | avg_n_categories_LxM       | Số danh mục trung bình mỗi đơn                   |
+| **Risk & Quality ⭐** | Is_canceled                       | sum                      | L1M, L3M, L5M | sum_LxM_canceled        | Số lượng đơn hàng bị khách chủ động hủy             |
+|                      | Is_canceled, Order_id             | sum / count              | L1M, L3M, L5M | cancel_rate_LxM         | Tỷ lệ đơn bị lỗi/hủy (Tín hiệu mua ảo)              |
+|                      | Canceled_value, Order_value       | sum / sum                | History       | global_cancel_val_ratio | Tỉ lệ tiền hủy/tiền đặt lịch sử (Phát hiện VIP ảo)  |
+|                      | Is_canceled                       | last                     | History       | last_order_canceled     | Đơn gần nhất có bị hủy không                        |
+| **Diversity ⭐**      | Order_n_lines, Order_n_categories | mean(Lines / Categories) | L1M, L3M, L5M | avg_items_per_cat_LxM   | Số sản phẩm trung bình trên mỗi danh mục            |
+|       | Order_n_categories, Order_id | sum / count | L1M, L3M, L5M | category_diversity_LxM   | Số danh mục trung bình trên mỗi đơn (Đa dạng hay đơn điệu)            |
+| **Intensity ⭐**      | Order_val, AOV                    | Last / AOV               | Last Order    | last_order_intensity    | Cường độ đơn hàng gần nhất                          |
+| **Velocity ⭐**       | Order_value                       | L1M / (L3M / 3)          | Trend         | spend_velocity          | Tốc độ chi tiêu đang nóng lên hay nguội đi          |
+|                      | Order_id                          | L1M / (L3M / 3)          | Trend         | order_acceleration      | Gia tốc đặt đơn đang tăng hay giảm                  |
+|                      | Orders                            | cnt_L5M_orders / 5       | L5M           | order_velocity          | Tần suất mua hàng trung bình mỗi tháng              |
+| **Stability**        | std_L5M_value, avg_L5M_value      | std / mean               | L5M           | cv_L5M_value            | Độ biến thiên chi tiêu (ổn định hay đột biến)       |
+| **Rhythm ⭐**         | Order_date                        | mean(gap)                | L5M           | avg_gap_L5M             | Chu kỳ mua hàng trung bình (ngày/đơn)               |
+| **Activity ⭐**       | Order_date                        | count(distinct month)    | L5M           | active_months_L5M       | Số tháng có mua trong 5 tháng                       |
+| **Geography**        | Country                           | Binary (UK=1, else=0)    | History       | is_UK                   | Phân loại khách nội địa vs quốc tế                  |
 
 
-Sau khi thực hiện Feature Engineering, tổng số lượng các cột là 87 cột
+Sau khi thực hiện Feature Engineering, tổng số lượng các cột là 51 cột
                                      
 
 # 3.6 Feature Selection
