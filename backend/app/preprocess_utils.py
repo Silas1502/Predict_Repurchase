@@ -394,7 +394,7 @@ SCALER_PARAMS = {
 
 # Khởi tạo và save preprocessor
 preprocessor = OnlineRetailPreprocessor(final_features=FINAL_FEATURES_22, scaler_params=SCALER_PARAMS)
-os.makedirs('./backend/models', exist_ok=True)
-joblib.dump(preprocessor, './backend/models/preprocessor.pkl')
+os.makedirs('../models', exist_ok=True)
+joblib.dump(preprocessor, '../models/preprocessor.pkl')
 
 print(f"🚀 Preprocessor sẵn sàng với {len(FINAL_FEATURES_22)} features!")
